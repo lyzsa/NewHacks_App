@@ -48,12 +48,22 @@ const EmailSettingsModal: React.FC<EmailSettingsProps> = ({ isOpen, onClose, onS
     setTestResult(null);
 
     try {
-      const response = await fetch('/api/email', {
+      // First update settings
+      await fetch('http://localhost:5001/api/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'update-settings',
           settings: settings,
+        }),
+      });
+
+      // Then test connection
+      const response = await fetch('http://localhost:5001/api/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'test-connection',
         }),
       });
 

@@ -6,22 +6,23 @@ import { StockAlert } from '@/types';
 import { EmailSettings } from '@/types/email';
 import { mockStockAlerts, generateRandomAlert } from '@/data/mockData';
 import StockCard from '@/components/StockCard';
-import EmailSettingsModal from '@/components/EmailSettings';
+import SimpleEmailSettingsModal from '@/components/SimpleEmailSettings';
 
 export default function Dashboard() {
   const [alerts, setAlerts] = useState<StockAlert[]>(mockStockAlerts);
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [emailSettings, setEmailSettings] = useState<EmailSettings | null>(null);
+  const [userEmail, setUserEmail] = useState<string>('');
+  const [emailEnabled, setEmailEnabled] = useState(false);
   const [showEmailSettings, setShowEmailSettings] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState<{ sent: number; failed: number }>({ sent: 0, failed: 0 });
 
   const sendEmailNotification = async (alert: StockAlert) => {
-    if (!emailSettings?.enabled) return;
+    if (!emailEnabled || !userEmail) return;
 
     try {
-      const response = await fetch('/api/email', {
+      const response = await fetch('http://localhost:5001/api/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -30,6 +31,7 @@ export default function Dashboard() {
             ...alert,
             emailSent: false,
           },
+          email: userEmail,
         }),
       });
 
@@ -58,7 +60,7 @@ export default function Dashboard() {
         setAlerts(prev => [newAlert, ...prev.slice(0, 7)]);
         
         // Send email notification for new high-priority alerts
-        if (newAlert.priority === 'high' && emailSettings?.enabled) {
+        if (newAlert.priority === 'high' && emailEnabled && userEmail) {
           await sendEmailNotification(newAlert);
         }
       } else {
@@ -80,10 +82,12 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    // Load email settings from localStorage
-    const savedSettings = localStorage.getItem('emailSettings');
-    if (savedSettings) {
-      setEmailSettings(JSON.parse(savedSettings));
+    // Load user email from localStorage
+    const savedEmail = localStorage.getItem('userEmail');
+    const savedEnabled = localStorage.getItem('emailEnabled') === 'true';
+    if (savedEmail) {
+      setUserEmail(savedEmail);
+      setEmailEnabled(savedEnabled);
     }
   }, []);
 
@@ -92,7 +96,7 @@ export default function Dashboard() {
       const interval = setInterval(fetchAlerts, 30000); // 30 seconds
       return () => clearInterval(interval);
     }
-  }, [autoRefresh, emailSettings]);
+  }, [autoRefresh, emailEnabled, userEmail]);
 
   const handleManualRefresh = () => {
     fetchAlerts();
@@ -102,8 +106,11 @@ export default function Dashboard() {
     setAutoRefresh(!autoRefresh);
   };
 
-  const handleEmailSettingsSave = (settings: EmailSettings) => {
-    setEmailSettings(settings);
+  const handleEmailSave = (email: string) => {
+    setUserEmail(email);
+    setEmailEnabled(true);
+    localStorage.setItem('userEmail', email);
+    localStorage.setItem('emailEnabled', 'true');
   };
 
   const getStats = () => {
@@ -139,7 +146,7 @@ export default function Dashboard() {
                 <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>
               </div>
               
-              {emailSettings?.enabled && (
+              {emailEnabled && userEmail && (
                 <div className="flex items-center space-x-2 text-sm text-gray-600">
                   <Mail className="w-4 h-4" />
                   <span>Emails: {emailNotifications.sent} sent, {emailNotifications.failed} failed</span>
@@ -257,10 +264,10 @@ export default function Dashboard() {
       </div>
 
       {/* Email Settings Modal */}
-      <EmailSettingsModal
+      <SimpleEmailSettingsModal
         isOpen={showEmailSettings}
         onClose={() => setShowEmailSettings(false)}
-        onSave={handleEmailSettingsSave}
+        onSave={handleEmailSave}
       />
     </div>
   );
